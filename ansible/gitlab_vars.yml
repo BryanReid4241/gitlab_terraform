@@ -1,0 +1,8 @@
+packages:
+  - curl
+  - openssh-server
+  - ca-certificates
+  - tzdata
+  - perl
+  - postfix
+  - nfs-common

@@ -1,0 +1,37 @@
+- hosts: all
+  tasks:
+    # - name: Get vault token
+    #   set_fact:
+    #     vault_token: "{{ lookup('env', 'VAULT_TOKEN') }}"
+    #   no_log: true
+
+    # - name: Install python-pip
+    #   apt:
+    #     name: python-pip
+    #     state: present
+    #   delegate_to: localhost
+      
+    # - name: install hvac
+    #   ansible.builtin.pip:
+    #     name: hvac
+    #     state: present
+    #   delegate_to: localhost
+
+    # - name: Get current secrets file
+    #   set_fact:
+    #     current_secrets_file: "{{ lookup('file', '/etc/gitlab/gitlab-secrets.json') | b64encode }}"
+    
+    - name: slurp
+      ansible.builtin.slurp:
+        src: /etc/gitlab/gitlab-secrets.json
+      register: current_secrets_file
+      
+    - name: Write secret to vault
+      hashivault_secret:
+        mount_point: '/secrets'
+        secret: 'kv/pve'
+        data:
+          gitlab_secret_test: '{{ current_secrets_file | b64encode }}'
+        version: 2
+      delegate_to: localhost
+      become: no

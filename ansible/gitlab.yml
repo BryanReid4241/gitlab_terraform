@@ -1,0 +1,80 @@
+---
+- hosts: all
+  tasks:
+    - name: Load vars
+      include_vars:
+        file: gitlab_vars.yml
+
+    - name: Get vault token
+      set_fact:
+        vault_token: "{{ lookup('env', 'VAULT_TOKEN') }}"
+      no_log: true
+    
+    - name: Get gitlab secrets file from vault
+      set_fact:
+        gitlab_secret_b64: "{{ lookup('hashi_vault', 'secret=kv/data/gitlab:gitlab_secret url=http://10.10.10.148:8200 token=' + vault_token )}}"
+
+
+    # - name: Update all packages
+    #   apt:
+    #     upgrade: dist
+    #     force_apt_get: yes
+    
+    - name: Install some packages
+      apt:
+        name: '{{ item }}'
+        state: present
+      loop: '{{ packages }}'
+      
+    - name: Mount Backup NFS share
+      mount:
+        src: 10.10.10.55:/mnt/Storage/Backups/gitlab_backup
+        path: /mnt/gitlab_backup
+        opts: rw,sync,hard,intr
+        state: mounted
+        fstype: nfs
+        boot: yes
+      ignore_errors: yes
+
+    - name: Mount Config directory
+      mount:
+        src: 10.10.10.55:/mnt/Storage/gitlab
+        path: /mnt/gitlab
+        opts: rw,sync,hard,intr
+        state: mounted
+        fstype: nfs
+        boot: yes
+      ignore_errors: yes
+
+    - name: Setup repo
+      shell:
+        cmd: curl https://packages.gitlab.com/install/repositories/gitlab/gitlab-ee/script.deb.sh | bash
+     
+    - name: Install gitlab package
+      apt:
+        name: gitlab-ee
+        state: present
+      ignore_errors: yes
+    
+    - name: Copy over config file
+      copy:
+        src: gitlab.rb
+        dest: /etc/gitlab/gitlab.rb
+        owner: root
+        group: root
+        mode: 0600
+      notify: reconfigure gitlab
+    
+    - name: Copy over secrets file
+      copy:
+        dest: /mnt/gitlab/gitlab-secrets.json
+        content: '{{ gitlab_secret_b64 | b64decode }}'
+        owner: root
+        group: root
+        mode: 0600
+      notify: reconfigure gitlab
+
+  handlers:
+    - name: reconfigure gitlab
+      shell:
+        cmd: gitlab-ctl reconfigure

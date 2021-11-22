@@ -11,7 +11,7 @@ variable "cpu" {
 }
 
 variable "memory" {
-    default = 4000
+    default = 8000
 }
 
 variable "ip_address" {
